@@ -120,6 +120,8 @@ void setup() {
   pinMode(P2_BUZZER, OUTPUT);
 }
 
+
+
 void loop() {
   // poll EVERY button EVERY pass, in every mode
   startBtn.update();
@@ -216,9 +218,21 @@ void doResolve() {
   mode = READY_SET_GO;
 }
 
+void displayDraw() {
+  fillStrip(strip.Color(255, 255, 255));  // draw, display white ring
+}
+
+void displayWinner(uint8_t player) { // light up side of player green
+  colorWipeWinner(player);
+}
+
 void doGameOver() {
-  if (p1Lives <= 0 && p2Lives <= 0) fillStrip(strip.Color(120, 80, 0));  // draw  -> amber
-  else                              fillStrip(strip.Color(0, 120, 0));   // winner-> green
+  if (p1Lives <= 0 && p2Lives <= 0) { displayDraw(); 
+  } else  {
+    uint8_t winner = (p1Lives == 0) ? 2 : 1; 
+    displayWinner(winner);
+
+  }
 
   if (startBtn.fell()) { startNewGame(); mode = READY_SET_GO; }  // replay
   if (modeBtn.fell())  { mode = MODE_SELECT; }                   // change game
@@ -260,7 +274,7 @@ void announceWinner() {
 // ============================================================================
 void startDuel() {
   window       = START_WINDOW;
-  activePlayer = 1;            // P1 goes first
+  activePlayer = random(2) + 1;            // randomize
   g2Loser      = 0;
 }
 
@@ -284,7 +298,7 @@ void doG2Wait() {
   if (btns[target].fell()) {
     peep(activePlayer == 1 ? P1_BUZZER : P2_BUZZER);
     Serial.print("P"); Serial.print(activePlayer); Serial.println(" correct");
-    activePlayer = (activePlayer == 1) ? 2 : 1;
+    activePlayer = random(2) + 1;
     window = max((unsigned long)(window * SPEEDUP), (unsigned long)MIN_WINDOW);
     mode = G2_TURN;
     return;
@@ -308,6 +322,8 @@ void doG2Wait() {
 
 void duelLoss(int loser) {
   g2Loser = loser;
+  int winner =  loser == 1 ? 2 : 1; // 1 or 2
+  displayWinner(winner);
   peep(loser == 1 ? P1_BUZZER : P2_BUZZER);
   Serial.print("DUEL OVER - Player ");
   Serial.print(loser == 1 ? 2 : 1);
@@ -316,7 +332,6 @@ void duelLoss(int loser) {
 }
 
 void doG2Over() {
-fillStrip(strip.Color(0, 120, 0));
   // winner's HP LEDs stay lit as a victory marker
   showTurnLeds(g2Loser == 1 ? 2 : 1);
 
@@ -335,6 +350,15 @@ void colorWipe(uint32_t c, uint8_t wait) {
     strip.show();
     delay(wait);
   }
+}
+
+void colorWipeWinner(uint8_t player) { 
+  strip.clear(); 
+  for (uint16_t i = (player-1) * strip.numPixels()/2; i < strip.numPixels()/2 * player; i++) {
+    strip.setPixelColor(i, strip.Color(0, 255, 0));
+  }
+  strip.show();
+
 }
 
 void peep(int pin) {
