@@ -1,32 +1,12 @@
 #include <Adafruit_NeoPixel.h>
 #include <Bounce2.h>
 
-// ----------------------------------------------------------------------------
-//  Two-player colour game, two modes, picked from a mode-select screen.
-//
-//  MODE_SELECT : ring shows a constant colour per game. MODE btn cycles,
-//                START confirms and launches the selected game.
-//
-//  GAME 1 (reaction) : ring flashes a colour, each player races their own
-//                      clock to hit the match. 3 lives, window shrinks,
-//                      first to 0 loses. (Unchanged from before.)
-//
-//  GAME 2 (duel)     : turn-based sudden death. The active player's HP LEDs
-//                      light to show whose turn it is. They must hit the
-//                      colour shown on the ring. Correct -> turn passes,
-//                      window shrinks. Wrong press OR timeout = you lose.
-//                      (Timeout-as-loss is a design choice -- see notes.)
-//
-//  From either game-over screen: START = replay same game, MODE = back to
-//  the selector.
-// ----------------------------------------------------------------------------
 
 // ---- pins -------------------------------------------------------------------
-#define PIXEL_PIN    A5
-#define PIXEL_COUNT  20
+#define PIXEL_PIN    A5 // LED ring connection
+#define PIXEL_COUNT  20 // how many pixels on LED ring to light up
 
 // player 1 colour buttons
-// NOTE: pin 13 is the onboard LED -- it can read as permanently pressed under
 #define P1_RED      12
 #define P1_GREEN    11
 #define P1_BLUE     10
@@ -38,6 +18,7 @@
 #define P2_BLUE      A2
 #define P2_YELLOW    A3
 
+// buzzers
 #define P1_BUZZER    6
 #define P2_BUZZER    A4
 
@@ -51,7 +32,7 @@ const int           START_LIVES  = 3;
 const unsigned long START_WINDOW = 5000;   // ms for the first round
 const float         SPEEDUP      = 0.75;   // window *= this each round
 const unsigned long MIN_WINDOW   = 500;    // floor so it never becomes impossible
-const uint8_t       BRIGHTNESS   = 120;    // 0-255
+const uint8_t       BRIGHTNESS   = 60;    // 0-255
 
 // ---- colours ----------------------------------------------------------------
 enum Colour { RED = 0, GREEN = 1, BLUE = 2, YELLOW = 3 };
@@ -60,17 +41,19 @@ enum Colour { RED = 0, GREEN = 1, BLUE = 2, YELLOW = 3 };
 enum GameType { GAME_REACTION = 0, GAME_DUEL = 1, GAME_COUNT = 2 };
 uint8_t selectedGame = GAME_REACTION;
 
-// ---- hardware objects -------------------------------------------------------
+// LED ring
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 Bounce startBtn = Bounce();
 Bounce modeBtn  = Bounce();
-Bounce p1[4];   // indexed by Colour
-Bounce p2[4];
+Bounce p1[4];   // Bouncer for player 1 buttons
+Bounce p2[4];   // Bouncer player 2 buttons
 
+// Player button pins
 const uint8_t p1Pins[4]   = { P1_RED, P1_GREEN, P1_BLUE, P1_YELLOW };
 const uint8_t p2Pins[4]   = { P2_RED, P2_GREEN, P2_BLUE, P2_YELLOW };
 
+// HP LEDs
 const uint8_t p1LedPins[3] = { 0, 1, 4 }; // RX, TX, D4
 const uint8_t p2LedPins[3] = { 25, MOSI, MISO }; // SCK, MO, MI
 
@@ -107,6 +90,7 @@ bool seeded = false;                   // seed RNG on first human START press
 void setup() {
   Serial.begin(115200);
 
+  // Register buttons with input pullup
   for (uint8_t c = 0; c < 4; c++) {
     p1[c].attach(p1Pins[c], INPUT_PULLUP);
     p1[c].interval(15);
@@ -114,26 +98,30 @@ void setup() {
     p2[c].interval(15);
   }
 
+  // Register LEDs as output
   for (int i = 0; i < 3; i++) {
     pinMode(p1LedPins[i], OUTPUT);
     pinMode(p2LedPins[i], OUTPUT);
   }
 
+  // Register buttons to bouncers
   startBtn.attach(START_BTN, INPUT_PULLUP);
   startBtn.interval(15);
   modeBtn.attach(GAME_MODE_BTN, INPUT_PULLUP);
   modeBtn.interval(15);
 
-  strip.begin();
+  // Configure LED ring
   strip.setBrightness(BRIGHTNESS);
-  strip.show();                        // all off
+  strip.begin();
+  strip.show();  // Initialize all pixels to 'off'
 
+  // Buzzer as output
   pinMode(P1_BUZZER, OUTPUT);
   pinMode(P2_BUZZER, OUTPUT);
 }
 
 void loop() {
-  // poll EVERY button EVERY pass, in every mode -- debounce must stay live
+  // poll EVERY button EVERY pass, in every mode
   startBtn.update();
   modeBtn.update();
   for (uint8_t c = 0; c < 4; c++) { p1[c].update(); p2[c].update(); }
@@ -166,7 +154,7 @@ void doModeSelect() {
   }
 
   if (startBtn.fell()) {
-    if (!seeded) { randomSeed(micros()); seeded = true; }  // entropy from human timing
+    if (!seeded) { randomSeed(micros()); seeded = true; }  // seed when player presses start
     if (selectedGame == GAME_REACTION) { startNewGame(); mode = READY_SET_GO; }
     else                               { startDuel();    mode = G2_TURN;      }
   }
