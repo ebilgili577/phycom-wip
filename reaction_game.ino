@@ -22,15 +22,15 @@
 // ----------------------------------------------------------------------------
 
 // ---- pins -------------------------------------------------------------------
-#define PIXEL_PIN    5
+#define PIXEL_PIN    A5
 #define PIXEL_COUNT  20
 
 // player 1 colour buttons
 // NOTE: pin 13 is the onboard LED -- it can read as permanently pressed under
-#define P1_RED      13
-#define P1_GREEN    12
-#define P1_BLUE     11
-#define P1_YELLOW   10
+#define P1_RED      12
+#define P1_GREEN    11
+#define P1_BLUE     10
+#define P1_YELLOW   9
 
 // player 2 colour buttons
 #define P2_RED       A0
@@ -38,11 +38,11 @@
 #define P2_BLUE      A2
 #define P2_YELLOW    A3
 
-#define P1_BUZZER    A4
-#define P2_BUZZER    A5
+#define P1_BUZZER    6
+#define P2_BUZZER    A4
 
-#define START_BTN       9
-#define GAME_MODE_BTN  25   // SCK 
+#define START_BTN      22 // SCL
+#define GAME_MODE_BTN  5    
 
 #define READY_TIMER 50       // colorWipe step (ms). 
 
@@ -71,8 +71,8 @@ Bounce p2[4];
 const uint8_t p1Pins[4]   = { P1_RED, P1_GREEN, P1_BLUE, P1_YELLOW };
 const uint8_t p2Pins[4]   = { P2_RED, P2_GREEN, P2_BLUE, P2_YELLOW };
 
-const uint8_t p1LedPins[3] = { 0, 1, 4 };
-const uint8_t p2LedPins[3] = { MOSI, MISO, SDA };
+const uint8_t p1LedPins[3] = { 0, 1, 4 }; // RX, TX, D4
+const uint8_t p2LedPins[3] = { 25, MOSI, MISO }; // SCK, MO, MI
 
 // ---- game state -------------------------------------------------------------
 enum Mode {
