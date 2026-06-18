@@ -120,8 +120,6 @@ void setup() {
   pinMode(P2_BUZZER, OUTPUT);
 }
 
-
-
 void loop() {
   // poll EVERY button EVERY pass, in every mode
   startBtn.update();
@@ -164,7 +162,7 @@ void doModeSelect() {
 
 uint32_t modeColour(uint8_t g) {
   switch (g) {
-    case GAME_REACTION: return strip.Color(0, 255, 255);    // cyan
+    case GAME_REACTION: return strip.Color(0, 127, 127);    // cyan
     case GAME_DUEL:     return strip.Color(255, 127, 0);    // orange
   }
   return 0;
@@ -179,18 +177,18 @@ void doReadySetGo() {
 }
 
 void doShowColor() {
-  target     = random(4);
-  roundStart = millis();
+  target     = random(4); // randoimze; red, green, blue or yellow
+  roundStart = millis(); // time it
   p1Resolved = false;
   p2Resolved = false;
-  fillStrip(colourValue(target));
+  fillStrip(colourValue(target)); // dye the ring 
 
   Serial.print("Round - target ");  Serial.print(colourName(target));
   Serial.print(" | window ");       Serial.print(window);
   Serial.print("ms | P1 ");         Serial.print(p1Lives);
   Serial.print(" P2 ");             Serial.println(p2Lives);
 
-  mode = WAITING;
+  mode = WAITING; // wait for input
 }
 
 void doWaiting() {
@@ -198,8 +196,8 @@ void doWaiting() {
   if (!p2Resolved) checkPlayer(p2, target, p2Resolved, p2Lives, 2);
 
   if (millis() - roundStart >= window) {
-    if (!p1Resolved) { p1Lives--; peep(P1_BUZZER); p1Resolved = true; Serial.println("P1 timeout -1"); }
-    if (!p2Resolved) { p2Lives--; peep(P2_BUZZER); p2Resolved = true; Serial.println("P2 timeout -1"); }
+    if (!p1Resolved) { p1Lives--; soundWrong(P1_BUZZER); p1Resolved = true; Serial.println("P1 timeout -1"); }
+    if (!p2Resolved) { p2Lives--; soundWrong(P2_BUZZER); p2Resolved = true; Serial.println("P2 timeout -1"); }
   }
 
   if (p1Resolved && p2Resolved) mode = RESOLVE;
@@ -207,19 +205,27 @@ void doWaiting() {
 
 void doResolve() {
   updateLives();
-  roundFeedback();
 
   if (p1Lives <= 0 || p2Lives <= 0) {
     announceWinner();
+    if (p1Lives <= 0 && p2Lives <= 0) {
+      soundLose(P1_BUZZER);                              //TODO: MAKE DRAW SOUND, maybe back and forth
+    } else {
+      int winnerPin = (p1Lives <= 0) ? P2_BUZZER : P1_BUZZER;
+      int loserPin  = (p1Lives <= 0) ? P1_BUZZER : P2_BUZZER;
+      soundWin(winnerPin);      // winner fanfare
+      soundLose(loserPin);                         
+    }
     mode = GAME_OVER;
     return;
   }
+  // reduce window
   window = max((unsigned long)(window * SPEEDUP), (unsigned long)MIN_WINDOW);
   mode = READY_SET_GO;
 }
 
 void displayDraw() {
-  fillStrip(strip.Color(255, 255, 255));  // draw, display white ring
+  fillStrip(strip.Color(127, 127, 127));  // draw, display white ring
 }
 
 void displayWinner(uint8_t player) { // light up side of player green
@@ -240,14 +246,17 @@ void doGameOver() {
 
 // Resolve one player from their first relevant press this pass.
 void checkPlayer(Bounce* btns, uint8_t tgt, bool &resolved, int &lives, int who) {
+  int pin = (who == 1) ? P1_BUZZER : P2_BUZZER;
   if (btns[tgt].fell()) {              // correct colour
     resolved = true;
+    soundCorrect(pin);
     Serial.print("P"); Serial.print(who); Serial.println(" correct");
     return;
   }
   for (uint8_t c = 0; c < 4; c++) {    // any wrong colour
     if (c != tgt && btns[c].fell()) {
       resolved = true;
+      soundWrong(pin);
       lives--;
       Serial.print("P"); Serial.print(who); Serial.println(" WRONG -1");
       return;
@@ -296,7 +305,7 @@ void doG2Wait() {
 
   // correct -> pass the turn, speed up
   if (btns[target].fell()) {
-    peep(activePlayer == 1 ? P1_BUZZER : P2_BUZZER);
+    soundCorrect(activePlayer == 1 ? P1_BUZZER : P2_BUZZER);  
     Serial.print("P"); Serial.print(activePlayer); Serial.println(" correct");
     activePlayer = random(2) + 1;
     window = max((unsigned long)(window * SPEEDUP), (unsigned long)MIN_WINDOW);
@@ -304,7 +313,7 @@ void doG2Wait() {
     return;
   }
 
-  // wrong colour -> you lose
+  // wrong colour -> lose
   for (uint8_t c = 0; c < 4; c++) {
     if (c != target && btns[c].fell()) {
       Serial.print("P"); Serial.print(activePlayer); Serial.println(" WRONG colour");
@@ -313,7 +322,7 @@ void doG2Wait() {
     }
   }
 
-  // too slow -> counts as a mistake, you lose
+  // too slow -> counts as a mistake, lose
   if (millis() - roundStart >= window) {
     Serial.print("P"); Serial.print(activePlayer); Serial.println(" too slow");
     duelLoss(activePlayer);
@@ -324,7 +333,8 @@ void duelLoss(int loser) {
   g2Loser = loser;
   int winner =  loser == 1 ? 2 : 1; // 1 or 2
   displayWinner(winner);
-  peep(loser == 1 ? P1_BUZZER : P2_BUZZER);
+  soundWin(winner == 1 ? P1_BUZZER : P2_BUZZER);  
+  soundLose(loser == 1 ? P1_BUZZER : P2_BUZZER);
   Serial.print("DUEL OVER - Player ");
   Serial.print(loser == 1 ? 2 : 1);
   Serial.println(" wins!");
@@ -343,8 +353,9 @@ void doG2Over() {
 //  shared helpers
 // ============================================================================
 
-// Fill the dots one after the other with a colour (blocking, between-rounds only)
+// Ready set go display between rounds
 void colorWipe(uint32_t c, uint8_t wait) {
+  strip.clear(); 
   for (uint16_t i = 0; i < strip.numPixels(); i++) {
     strip.setPixelColor(i, c);
     strip.show();
@@ -359,12 +370,6 @@ void colorWipeWinner(uint8_t player) {
   }
   strip.show();
 
-}
-
-void peep(int pin) {
-  analogWrite(pin, 20);
-  delay(100);
-  analogWrite(pin, 0);
 }
 
 uint32_t colourValue(uint8_t c) {
@@ -410,11 +415,42 @@ void showTurnLeds(int who) {
 }
 
 
-// The only blocking spot mid-game: lives between rounds where no input matters.
-void roundFeedback() {
-  fillStrip(colourValue(target));
-  delay(180);
-  fillStrip(0);
-  delay(120);
+// ---- game sounds ------------------------------------------------------------
+
+void soundCorrect(int pin) {
+  tone(pin, 988);  delay(80);   // B5
+  tone(pin, 1319); delay(120);  // E6  -> rising "bleep-bloop"
+  noTone(pin);
+}
+
+void soundWrong(int pin) {
+  tone(pin, 220);  delay(150);  // A3
+  tone(pin, 165);  delay(250);  // E3  -> descending "wah-wah"
+  noTone(pin);
+}
+
+
+// "Sad trombone"
+void soundLose(int pin) {
+  tone(pin, 311); delay(320);   // Eb4
+  tone(pin, 294); delay(320);   // D4
+  tone(pin, 277); delay(320);   // Db4
+  tone(pin, 262); delay(550);   // C4, held
+  // final defeated slide downward
+  for (int f = 262; f > 200; f -= 10) { tone(pin, f); delay(14); }
+  tone(pin, 160); delay(400);
+  noTone(pin);
+}
+// classic "da-da-da-DAAA ... da-DAAA"
+void soundWin(int pin) {
+  tone(pin, 784);  delay(160);  // G5
+  tone(pin, 784);  delay(160);  // G5
+  tone(pin, 784);  delay(160);  // G5
+  tone(pin, 1047); delay(500);  // C6, big hold
+  noTone(pin);     delay(120);  // breath
+  tone(pin, 880);  delay(180);  // A5
+  tone(pin, 1047); delay(180);  // C6
+  tone(pin, 1319); delay(650);  // E6, triumphant final hold
+  noTone(pin);
 }
 
