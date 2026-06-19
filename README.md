@@ -59,9 +59,10 @@ to the mode selector.
 
 | Stage | Photo |
 | --- | --- |
-| Breadboard prototype | ![Breadboard prototype](docs/images/breadboard_prototype.jpg) |
 | Cardboard form-factor sketch | ![Cardboard prototype](docs/images/carton_prototype.jpg) |
+| Breadboard prototype | ![Breadboard prototype](docs/images/breadboard_prototype.jpg) |
 | Laser-cutting the chassis | ![Laser cutting](docs/images/laserr.jpg) |
+| Final game | ![Final game](docs/images/final.png) |
 
 ## License
 
